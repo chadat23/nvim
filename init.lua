@@ -1,3 +1,16 @@
+-- init.lua
+--
+-- -- At the beginning of init.lua
+local filetypes = {
+    longform = {
+        "markdown",
+        "text",
+        -- Add more file extensions as needed
+    }
+}
+
+-- Base configuration (common to all file types)
+-- [Your existing basic configurations go here]
 -- See `:help mapleader`
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
@@ -20,9 +33,6 @@ vim.opt.showmode = false
 
 --  See `:help 'clipboard'`
 vim.opt.clipboard = 'unnamedplus'
-
--- Enable break indent
-vim.opt.breakindent = true
 
 -- Save undo history
 vim.opt.undofile = true
@@ -75,6 +85,7 @@ vim.keymap.set('n', '<down>', '<cmd>echo "Use j to move!!"<CR>')
 
 -- Some key bindings are just anoying
 vim.keymap.set('n', '.', '<cmd>echo ". are so dumb"<CR>')
+vim.keymap.set('n', '<C-z>', '<cmd>echo "<C-z> are so dumb"<CR>')
 
 -- Keybinds to make split navigation easier.
 --  Use CTRL+<hjkl> to switch between windows
@@ -99,6 +110,89 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   end,
 })
 
+-- Coding-specific configuration
+local function setup_coding_config()
+    -- [Your existing coding-specific configurations go here]
+
+    -- Enable break indent
+    vim.opt.breakindent = true
+end
+
+-- Long-form writing configuration
+local function setup_longform_config()
+    -- Configurations for long-form writing
+    vim.opt.wrap = true
+    vim.opt.linebreak = true
+    vim.opt.spell = true
+    vim.opt.spelllang = "en_us"
+    vim.opt.textwidth = 80
+    vim.opt.columns = 80
+
+    -- Add more long-form writing specific settings here
+    -- In Visual mode, read the selected text
+    --vim.keymap.set('v', '<F1>', ':w !espeak -s 150 &<cr>')
+    vim.keymap.set('v', '<F1>', function()
+        -- Get the visually selected text
+        local start_pos = vim.fn.getpos("'<")
+        local end_pos = vim.fn.getpos("'>")
+        local lines = vim.fn.getline(start_pos[2], end_pos[2])
+    
+        -- If the selection spans multiple lines, extract the selected portion
+        if #lines > 0 then
+            lines[#lines] = string.sub(lines[#lines], 1, end_pos[3])
+            lines[1] = string.sub(lines[1], start_pos[3])
+        end
+    
+        -- Write the selected text to a temporary file
+        vim.fn.writefile(lines, '/tmp/nvim_selected.txt')
+    
+        -- Use espeak to read the text
+        vim.fn.system('espeak -s 150 -f /tmp/nvim_selected.txt &')
+    end)
+
+    -- In Normal mode play the current line
+    --vim.keymap.set('n', '<F1>', ':<C-U>normal! vipy<cr>:!echo -n \\" @\" \\" > /tmp/nvim_text.txt & espeak -s 150 -f /tmp/nvim_text.txt &<cr>')
+    vim.keymap.set('n', '<F1>', function()
+        vim.cmd('normal! vipy')
+        local paragraph = vim.fn.getreg('"')
+        vim.fn.writefile({paragraph}, '/tmp/nvim_text.txt')
+        vim.fn.system('espeak -s 150 -f /tmp/nvim_text.txt &')
+    end)
+    --vim.keymap.set('n', '<F1>', ':w !espeak -s 150 &<cr>')
+    --vim.keymap.set('n', '<F1>', ':.w !setsid -f espeak -s 150 -D<cr><cr>')
+    --vim.keymap.set('n', '<F1>', ':.w !setsid -f espeak -s 150 -D<cr><cr>')
+    -- Play from the current line to the end of file.
+    vim.keymap.set('n', '<F11>', ':.,$w !setsid -f espeak -s 150 -D<cr><cr>')
+    -- In insert mode, use ctrl-enter to read the newly inserted line.
+    vim.keymap.set('i', '<C-CR>', '<Esc>:.w !setsid -f espeak<CR>o')
+    -- Stop playing
+    vim.keymap.set('n', '<F12>', ':!pkill espeak<cr><cr>')
+
+end
+
+-- Apply the appropriate configuration based on file type
+vim.api.nvim_create_autocmd({"BufEnter", "BufWinEnter"}, {
+    pattern = "*",
+    callback = function()
+        local ft = vim.bo.filetype
+        if vim.tbl_contains(filetypes.longform, ft) then
+            setup_longform_config()
+        else
+            setup_coding_config()
+        end
+    end
+})
+
+-- Keybindings for long-form mode
+vim.api.nvim_create_autocmd("FileType", {
+    pattern = filetypes.longform,
+    callback = function()
+        vim.keymap.set('n', '<leader>o', ':Goyo<CR>', {buffer = true})
+        vim.keymap.set('n', '<leader>l', ':Limelight!!<CR>', {buffer = true})
+    end
+})
+
+-- [Your existing lazy.nvim setup code]
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not vim.loop.fs_stat(lazypath) then
   vim.fn.system({
@@ -112,8 +206,10 @@ if not vim.loop.fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
+-- Plugin setup
 local plugins = {
-  { "bluz71/vim-moonfly-colors", name = "moonfly", lazy = false, priority = 1000 },
+    -- [Your existing plugins]
+{ "bluz71/vim-moonfly-colors", name = "moonfly", lazy = false, priority = 1000 },
   {
     'nvim-telescope/telescope.nvim', tag = '0.1.5',
     event = 'VimEnter',
@@ -245,7 +341,30 @@ local plugins = {
       --  Check out: https://github.com/echasnovski/mini.nvim
     end,
   },
+  -- Add plugins specific to long-form writing
+  {
+    "preservim/vim-pencil",
+    ft = filetypes.longform,
+    config = function()
+      vim.cmd[[
+        let g:pencil#wrapModeDefault = 'soft'
+        augroup pencil
+          autocmd!
+          autocmd FileType markdown,text call pencil#init()
+        augroup END
+      ]]
+    end
+  },
+  {
+    "junegunn/goyo.vim",
+    ft = filetypes.longform,
+  },
+  --{
+    --"junegunn/limelight.vim",
+    --ft = filetypes.longform,
+  --},
 }
+
 local opts = {}
 
 require("lazy").setup(plugins, opts)
