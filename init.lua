@@ -118,6 +118,15 @@ local function setup_coding_config()
     vim.opt.breakindent = true
 end
 
+function StopSpeakFile()
+    if _G.festival_job_id then
+        vim.fn.jobstop(_G.festival_job_id)
+        _G.festival_job_id = nil
+    else
+        print("No TTS process running.")
+    end
+end
+
 -- Long-form writing configuration
 local function setup_longform_config()
     -- Configurations for long-form writing
@@ -136,27 +145,34 @@ local function setup_longform_config()
         local start_pos = vim.fn.getpos("'<")
         local end_pos = vim.fn.getpos("'>")
         local lines = vim.fn.getline(start_pos[2], end_pos[2])
-    
+
         -- If the selection spans multiple lines, extract the selected portion
         if #lines > 0 then
             lines[#lines] = string.sub(lines[#lines], 1, end_pos[3])
             lines[1] = string.sub(lines[1], start_pos[3])
         end
-    
+
         -- Write the selected text to a temporary file
         vim.fn.writefile(lines, '/tmp/nvim_selected.txt')
-    
+
         -- Use espeak to read the text
         vim.fn.system('espeak -s 150 -f /tmp/nvim_selected.txt &')
     end)
 
-    -- In Normal mode play the current line
+    -- In Normal mode play the current linem
     --vim.keymap.set('n', '<F1>', ':<C-U>normal! vipy<cr>:!echo -n \\" @\" \\" > /tmp/nvim_text.txt & espeak -s 150 -f /tmp/nvim_text.txt &<cr>')
+    -- https://www.youtube.com/watch?v=Ju_X11JyRSE
+    -- cmu_us_slt_cg
     vim.keymap.set('n', '<F1>', function()
         vim.cmd('normal! vipy')
         local paragraph = vim.fn.getreg('"')
         vim.fn.writefile({paragraph}, '/tmp/nvim_text.txt')
-        vim.fn.system('espeak -s 150 -f /tmp/nvim_text.txt &')
+        --vim.fn.system('espeak -s 150 -f /tmp/nvim_text.txt &')
+        --vim.fn.system('festival --tts /tmp/nvim_text.txt &')
+        --vim.fn.system('festival --tts /tmp/nvim_text.txt &')
+        _G.festival_job_id = vim.fn.jobstart({
+            "bash", "-c", "echo \"(voice_cmu_us_clb_cg) (Parameter.set 'Duration_Stretch 0.5) (tts '/tmp/nvim_text.txt' nil)\" | festival --pipe"
+        })
     end)
     --vim.keymap.set('n', '<F1>', ':w !espeak -s 150 &<cr>')
     --vim.keymap.set('n', '<F1>', ':.w !setsid -f espeak -s 150 -D<cr><cr>')
@@ -166,7 +182,8 @@ local function setup_longform_config()
     -- In insert mode, use ctrl-enter to read the newly inserted line.
     vim.keymap.set('i', '<C-CR>', '<Esc>:.w !setsid -f espeak<CR>o')
     -- Stop playing
-    vim.keymap.set('n', '<F12>', ':!pkill espeak<cr><cr>')
+    --vim.keymap.set('n', '<F12>', ':!pkill espeak<cr><cr>')
+    vim.api.nvim_set_keymap('n', '<F12>', ':lua StopSpeakFile()<cr>', { noremap = true, silent = true })
 
 end
 
@@ -214,7 +231,7 @@ local plugins = {
     'nvim-telescope/telescope.nvim', tag = '0.1.5',
     event = 'VimEnter',
     branch = '0.1.x',
-    dependencies = { 
+    dependencies = {
       'nvim-lua/plenary.nvim',
       { -- If encountering errors, see telescope-fzf-native README for install instructions
         'nvim-telescope/telescope-fzf-native.nvim',
@@ -300,10 +317,10 @@ local plugins = {
     end,
   },
   { -- Highlight todo, notes, etc in comments
-    'folke/todo-comments.nvim', 
-    event = 'VimEnter', 
-    dependencies = { 'nvim-lua/plenary.nvim' }, 
-    opts = { signs = false } 
+    'folke/todo-comments.nvim',
+    event = 'VimEnter',
+    dependencies = { 'nvim-lua/plenary.nvim' },
+    opts = { signs = false }
   },
   { -- Collection of various small independent plugins/modules
     'echasnovski/mini.nvim',
@@ -373,7 +390,7 @@ local config = require("nvim-treesitter.configs")
 config.setup({
     ensure_installed = {"rust", "lua", "vim", "vimdoc", "query", "javascript", "html" },
     highlight = { enable = true },
-    indent = { enable = true }, 
+    indent = { enable = true },
     ignore_install = { "javascript" },
 })
 
