@@ -137,6 +137,10 @@ local function setup_longform_config()
     vim.opt.textwidth = 80
     vim.opt.columns = 80
 
+    -- Get the path of the current file (i.e., init.lua)
+    local init_path = debug.getinfo(1, 'S').source:sub(2)
+    local init_dir = vim.fn.fnamemodify(init_path, ':p:h')
+
     -- Add more long-form writing specific settings here
     -- In Visual mode, read the selected text
     --vim.keymap.set('v', '<F1>', ':w !espeak -s 150 &<cr>')
@@ -166,13 +170,20 @@ local function setup_longform_config()
     vim.keymap.set('n', '<F1>', function()
         vim.cmd('normal! vipy')
         local paragraph = vim.fn.getreg('"')
-        vim.fn.writefile({paragraph}, '/tmp/nvim_text.txt')
-        --vim.fn.system('espeak -s 150 -f /tmp/nvim_text.txt &')
-        --vim.fn.system('festival --tts /tmp/nvim_text.txt &')
-        --vim.fn.system('festival --tts /tmp/nvim_text.txt &')
-        _G.festival_job_id = vim.fn.jobstart({
-            "bash", "-c", "echo \"(voice_cmu_us_clb_cg) (Parameter.set 'Duration_Stretch 0.5) (tts '/tmp/nvim_text.txt' nil)\" | festival --pipe"
-        })
+        --[[paragraph = paragraph
+            :gsub('\\', '\\\\')  -- Escape backslashes
+            :gsub('"', '\\"')    -- Escape double quotes
+            :gsub("'", "\\'")    -- Escape single quotes
+            :gsub("\n", "\\n")   -- Escape newlines
+            :gsub("\r", "\\r")   -- Escape carriage returns
+            :gsub("\t", "\\t")   -- Escape tabs
+            :gsub("\v", "\\v")   -- Escape vertical tabs
+            :gsub("\f", "\\f")   -- Escape form feeds
+            :gsub("\b", "\\b")   -- Escape backspaces
+            :gsub("\a", "\\a")   -- Escape bell/alert (if applicable)
+            :gsub("\0", "\\0")   -- Escape null characters]]
+        vim.fn.system({init_dir .. "/fetch.py", paragraph})
+        _G.speak_job_id = vim.fn.jobstart("ffplay -nodisp -autoexit -af 'atempo=2' /tmp/sound.mp3")
     end)
     --vim.keymap.set('n', '<F1>', ':w !espeak -s 150 &<cr>')
     --vim.keymap.set('n', '<F1>', ':.w !setsid -f espeak -s 150 -D<cr><cr>')
@@ -308,11 +319,16 @@ local plugins = {
 
       -- Document existing key chains
       require('which-key').register {
-        ['<leader>c'] = { name = '[C]ode', _ = 'which_key_ignore' },
-        ['<leader>d'] = { name = '[D]ocument', _ = 'which_key_ignore' },
-        ['<leader>r'] = { name = '[R]ename', _ = 'which_key_ignore' },
-        ['<leader>s'] = { name = '[S]earch', _ = 'which_key_ignore' },
-        ['<leader>w'] = { name = '[W]orkspace', _ = 'which_key_ignore' },
+        { "<leader>c", group = "[C]ode" },
+        { "<leader>c_", hidden = true },
+        { "<leader>d", group = "[D]ocument" },
+        { "<leader>d_", hidden = true },
+        { "<leader>r", group = "[R]ename" },
+        { "<leader>r_", hidden = true },
+        { "<leader>s", group = "[S]earch" },
+        { "<leader>s_", hidden = true },
+        { "<leader>w", group = "[W]orkspace" },
+        { "<leader>w_", hidden = true },
       }
     end,
   },
