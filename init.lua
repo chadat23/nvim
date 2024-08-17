@@ -119,9 +119,9 @@ local function setup_coding_config()
 end
 
 function StopSpeakFile()
-    if _G.festival_job_id then
-        vim.fn.jobstop(_G.festival_job_id)
-        _G.festival_job_id = nil
+    if _G.speak_job_id then
+        vim.fn.jobstop(_G.speak_job_id)
+        _G.speak_job_id = nil
     else
         print("No TTS process running.")
     end
@@ -163,10 +163,7 @@ local function setup_longform_config()
         vim.fn.system('espeak -s 150 -f /tmp/nvim_selected.txt &')
     end)
 
-    -- In Normal mode play the current linem
-    --vim.keymap.set('n', '<F1>', ':<C-U>normal! vipy<cr>:!echo -n \\" @\" \\" > /tmp/nvim_text.txt & espeak -s 150 -f /tmp/nvim_text.txt &<cr>')
-    -- https://www.youtube.com/watch?v=Ju_X11JyRSE
-    -- cmu_us_slt_cg
+    -- In Normal mode play the current line
     vim.keymap.set('n', '<F1>', function()
         vim.cmd('normal! vipy')
         local paragraph = vim.fn.getreg('"')
@@ -185,15 +182,11 @@ local function setup_longform_config()
         vim.fn.system({init_dir .. "/fetch.py", paragraph})
         _G.speak_job_id = vim.fn.jobstart("ffplay -nodisp -autoexit -af 'atempo=2' /tmp/sound.mp3")
     end)
-    --vim.keymap.set('n', '<F1>', ':w !espeak -s 150 &<cr>')
-    --vim.keymap.set('n', '<F1>', ':.w !setsid -f espeak -s 150 -D<cr><cr>')
-    --vim.keymap.set('n', '<F1>', ':.w !setsid -f espeak -s 150 -D<cr><cr>')
     -- Play from the current line to the end of file.
     vim.keymap.set('n', '<F11>', ':.,$w !setsid -f espeak -s 150 -D<cr><cr>')
     -- In insert mode, use ctrl-enter to read the newly inserted line.
     vim.keymap.set('i', '<C-CR>', '<Esc>:.w !setsid -f espeak<CR>o')
     -- Stop playing
-    --vim.keymap.set('n', '<F12>', ':!pkill espeak<cr><cr>')
     vim.api.nvim_set_keymap('n', '<F12>', ':lua StopSpeakFile()<cr>', { noremap = true, silent = true })
 
 end
