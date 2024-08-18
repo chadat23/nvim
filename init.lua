@@ -127,6 +127,33 @@ function StopSpeakFile()
     end
 end
 
+-- Get the path of the current file (i.e., init.lua)
+local init_path = debug.getinfo(1, 'S').source:sub(2)
+local init_dir = vim.fn.fnamemodify(init_path, ':p:h')
+
+local function ReadTextAloud(text)
+        --[[text = text
+        :gsub('\\', '\\\\')  -- Escape backslashes
+        :gsub('"', '\\"')    -- Escape double quotes
+        :gsub("'", "\\'")    -- Escape single quotes
+        :gsub("\n", "\\n")   -- Escape newlines
+        :gsub("\r", "\\r")   -- Escape carriage returns
+        :gsub("\t", "\\t")   -- Escape tabs
+        :gsub("\v", "\\v")   -- Escape vertical tabs
+        :gsub("\f", "\\f")   -- Escape form feeds
+        :gsub("\b", "\\b")   -- Escape backspaces
+        :gsub("\a", "\\a")   -- Escape bell/alert (if applicable)
+        :gsub("\0", "\\0")   -- Escape null characters]]
+    vim.fn.system({init_dir .. "/fetch.py", text})
+    _G.speak_job_id = vim.fn.jobstart("ffplay -nodisp -autoexit -af 'atempo=2' /tmp/sound.mp3")
+end
+
+function tbl_length(T)
+    local count = 0
+    for _ in pairs(T) do count = count + 1 end
+    return count
+end
+
 -- Long-form writing configuration
 local function setup_longform_config()
     -- Configurations for long-form writing
@@ -137,55 +164,54 @@ local function setup_longform_config()
     vim.opt.textwidth = 80
     vim.opt.columns = 80
 
-    -- Get the path of the current file (i.e., init.lua)
-    local init_path = debug.getinfo(1, 'S').source:sub(2)
-    local init_dir = vim.fn.fnamemodify(init_path, ':p:h')
-
     -- Add more long-form writing specific settings here
     -- In Visual mode, read the selected text
-    --vim.keymap.set('v', '<F1>', ':w !espeak -s 150 &<cr>')
-    vim.keymap.set('v', '<F1>', function()
-        -- Get the visually selected text
-        local start_pos = vim.fn.getpos("'<")
-        local end_pos = vim.fn.getpos("'>")
-        local lines = vim.fn.getline(start_pos[2], end_pos[2])
-
-        -- If the selection spans multiple lines, extract the selected portion
-        if #lines > 0 then
-            lines[#lines] = string.sub(lines[#lines], 1, end_pos[3])
-            lines[1] = string.sub(lines[1], start_pos[3])
+    vim.keymap.set('v', '<F2>', function()
+        -- this will exit visual mode
+        -- use 'gv' to reselect the text
+        local _, csrow, cscol, cerow, cecol
+        local mode = vim.fn.mode()
+        if mode == "v" or mode == "V" or mode == "" then
+            -- if we are in visual mode use the live position
+            _, csrow, cscol, _ = unpack(vim.fn.getpos("."))
+            _, cerow, cecol, _ = unpack(vim.fn.getpos("v"))
+            if mode == "V" then
+                -- visual line doesn't provide columns
+                cscol, cecol = 0, 999
+            end
+            -- exit visual mode
+            vim.api.nvim_feedkeys(
+                 vim.api.nvim_replace_termcodes("<Esc>",
+                     true, false, true), "n", true)
+        else
+            -- otherwise, use the last known visual position
+            _, csrow, cscol, _ = unpack(vim.fn.getpos("'<"))
+            _, cerow, cecol, _ = unpack(vim.fn.getpos("'>"))
         end
+        -- swap vars if needed
+        if cerow < csrow then csrow, cerow = cerow, csrow end
+        if cecol < cscol then cscol, cecol = cecol, cscol end
+        local lines = vim.fn.getline(csrow, cerow)
+        -- local n = cerow-csrow+1
+        local n = tbl_length(lines)
+        if n <= 0 then return "" end
+        lines[n] = string.sub(lines[n], 1, cecol)
+        lines[1] = string.sub(lines[1], cscol)
+        local text = table.concat(lines, "\n")
 
-        -- Write the selected text to a temporary file
-        vim.fn.writefile(lines, '/tmp/nvim_selected.txt')
-
-        -- Use espeak to read the text
-        vim.fn.system('espeak -s 150 -f /tmp/nvim_selected.txt &')
+        ReadTextAloud(text)
     end)
 
     -- In Normal mode play the current line
-    vim.keymap.set('n', '<F1>', function()
+    vim.keymap.set('n', '<F2>', function()
         vim.cmd('normal! vipy')
-        local paragraph = vim.fn.getreg('"')
-        --[[paragraph = paragraph
-            :gsub('\\', '\\\\')  -- Escape backslashes
-            :gsub('"', '\\"')    -- Escape double quotes
-            :gsub("'", "\\'")    -- Escape single quotes
-            :gsub("\n", "\\n")   -- Escape newlines
-            :gsub("\r", "\\r")   -- Escape carriage returns
-            :gsub("\t", "\\t")   -- Escape tabs
-            :gsub("\v", "\\v")   -- Escape vertical tabs
-            :gsub("\f", "\\f")   -- Escape form feeds
-            :gsub("\b", "\\b")   -- Escape backspaces
-            :gsub("\a", "\\a")   -- Escape bell/alert (if applicable)
-            :gsub("\0", "\\0")   -- Escape null characters]]
-        vim.fn.system({init_dir .. "/fetch.py", paragraph})
-        _G.speak_job_id = vim.fn.jobstart("ffplay -nodisp -autoexit -af 'atempo=2' /tmp/sound.mp3")
+        local text = vim.fn.getreg('"')
+        ReadTextAloud(text)
     end)
     -- Play from the current line to the end of file.
-    vim.keymap.set('n', '<F11>', ':.,$w !setsid -f espeak -s 150 -D<cr><cr>')
+    --vim.keymap.set('n', '<F11>', ':.,$w !setsid -f espeak -s 150 -D<cr><cr>')
     -- In insert mode, use ctrl-enter to read the newly inserted line.
-    vim.keymap.set('i', '<C-CR>', '<Esc>:.w !setsid -f espeak<CR>o')
+    --vim.keymap.set('i', '<C-CR>', '<Esc>:.w !setsid -f espeak<CR>o')
     -- Stop playing
     vim.api.nvim_set_keymap('n', '<F12>', ':lua StopSpeakFile()<cr>', { noremap = true, silent = true })
 
