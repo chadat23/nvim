@@ -337,7 +337,7 @@ local plugins = {
       require('which-key').setup()
 
       -- Document existing key chains
-      require('which-key').register {
+      --[[require('which-key').register({
         { "<leader>c", group = "[C]ode" },
         { "<leader>c_", hidden = true },
         { "<leader>d", group = "[D]ocument" },
@@ -348,7 +348,7 @@ local plugins = {
         { "<leader>s_", hidden = true },
         { "<leader>w", group = "[W]orkspace" },
         { "<leader>w_", hidden = true },
-      }
+      })]]
     end,
   },
   { -- Highlight todo, notes, etc in comments
